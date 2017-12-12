@@ -99,6 +99,7 @@ def set_status():
 
 def frame_generator(picamera):
     """Camera frame generator"""
+    print("streaming images")
     while True:
         frame = picamera.get_frame()
         yield (b'--frame\r\n'
@@ -108,6 +109,7 @@ def frame_generator(picamera):
 
 def frame_generator_with_timestamp(picamera):
     """Camera frame generator"""
+    print("streaming images with info")
     while True:
         timestamp = time.time()
         timestamp_bytes = struct.pack('d', timestamp)
@@ -123,6 +125,12 @@ def frame_generator_with_timestamp(picamera):
                b'Content-Type: image/jpeg\r\n\r\n' +
                    frame + timestamp_bytes + width_bytes + height_bytes +
                b'\r\n')
+        # message = ("--jpgboundary\r\n"
+        #           "Content-Type: image/jpeg\r\n"
+        #           "Content-length: %s\r\n\r\n%s\r\n" % (
+        #             len(frame), frame
+        #           ))
+        # yield message.encode()
         time.sleep(0.5 / picamera.camera.framerate)
 
 
