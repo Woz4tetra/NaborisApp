@@ -8,5 +8,5 @@ sys.path.insert(0, PROJECT_DIR)
 
 from NaborisApp.NaborisApp import app as application
 # application.secret_key = 's0mething'
-application.debug = True
-# application.threaded = True
+application.debug = False
+application.threaded = True
