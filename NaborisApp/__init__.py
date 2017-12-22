@@ -107,9 +107,11 @@ def frame_generator(picamera):
         time.sleep(0.5 / picamera.camera.framerate)
 
 
-def frame_generator_with_timestamp(picamera):
+def frame_generator_with_meta(picamera):
     """Camera frame generator"""
     print("streaming images with info")
+    yield b'\xbb\x08'
+
     while True:
         timestamp = time.time()
         timestamp_bytes = struct.pack('d', timestamp)
@@ -121,9 +123,10 @@ def frame_generator_with_timestamp(picamera):
         height_bytes = height.to_bytes(2, 'big')
 
         frame = picamera.get_frame()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-                   frame + timestamp_bytes + width_bytes + height_bytes +
+        len_frame_bytes = len(frame).to_bytes(4, 'big')
+
+        yield (b'\xde\xad\xbe\xef' +
+                   len_frame_bytes + frame + timestamp_bytes + width_bytes + height_bytes +
                b'\r\n')
         time.sleep(0.5 / picamera.camera.framerate)
 
@@ -150,12 +153,12 @@ def get_camera():
     return Response(frame_generator(Camera()), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.route('/api/robot/rightcam_time', methods=['GET'])
+@app.route('/api/robot/rightcam_meta', methods=['GET'])
 @auth.login_required
-def get_camera_with_timestamp():
+def get_camera_with_meta():
     """Stream frames from the right camera to the client"""
     if auth.username() == ROBOT_USER:
-        return Response(frame_generator_with_timestamp(Camera()))
+        return Response(frame_generator_with_meta(Camera()))
 
 
 @app.route('/api/robot/imu', methods=['PUT'])
