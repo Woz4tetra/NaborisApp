@@ -1,4 +1,5 @@
 import time
+import json
 import struct
 from queue import Queue
 from flask import Flask, jsonify, abort, make_response, request, url_for, render_template, Response
@@ -19,6 +20,9 @@ users = {
 }
 
 command_queue = Queue()
+
+start_header = b'\xbb\x08'
+message_start_header = b'\xde\xad\xbe\xef'
 
 commands = ButtonCollection(
     Button("spin left", "l", "spin_left_button", "command_button drive"),
@@ -71,15 +75,47 @@ def status_page():
 @auth.login_required
 def put_command():
     """Put a command to send to the robot"""
-    command_queue.put(request.json)
-    return request.json, 200, {'Content-Type': 'text/plain'}
+    print("putting:", request.json)
+    command_timestamp = struct.pack('d', time.time())
+    command_queue.put((command_timestamp, request.json))
+    return make_response("", 200)
+
+def command_queue_generator(generator_queue):
+    yield start_header
+
+    while True:
+        with app.app_context():
+            # result = ""
+            # if generator_queue.empty():
+            #     result = ";\n"
+            #     time.sleep(0.1)
+            # else:
+            #     while not generator_queue.empty():
+            #         timestamp, command_json = generator_queue.get()
+            #         result += "%s-%s;\n" % (timestamp, command_json["command"])
+
+            if not generator_queue.empty():
+                command_timestamp, command_json = generator_queue.get()
+                result = command_timestamp + command_json["command"].encode()
+                len_result_bytes = len(result).to_bytes(4, 'big')
+                batch_timestamp = struct.pack('d', time.time())
+                result = message_start_header + len_result_bytes + batch_timestamp + result
+                print("sending '%s':" % command_json["command"])
+                print(result)
+                yield result
+            # else:
+            #     yield message_start_header + b"\x00\x00\x00\x00"
+            #     time.sleep(0.01)
+
 
 @app.route('/cmd', methods=['GET'])
 @auth.login_required
 def get_command():
     """Function for the robot. Retrieve command to execute"""
     if auth.username() == ROBOT_USER:
-        return jsonify(command_queue.get())
+        return Response(command_queue_generator(command_queue), mimetype='text/json')
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 
 @app.route('/api', methods=['GET'])
@@ -95,7 +131,8 @@ def set_status():
     """Function for the robot. Update the robot's current status"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 def frame_generator(picamera):
     """Camera frame generator"""
@@ -110,7 +147,7 @@ def frame_generator(picamera):
 def frame_generator_with_meta(picamera):
     """Camera frame generator"""
     print("streaming images with info")
-    yield b'\xbb\x08'
+    yield start_header
 
     while True:
         timestamp = time.time()
@@ -125,25 +162,10 @@ def frame_generator_with_meta(picamera):
         frame = picamera.get_frame()
         len_frame_bytes = len(frame).to_bytes(4, 'big')
 
-        yield (b'\xde\xad\xbe\xef' +
+        yield (message_start_header +
                    len_frame_bytes + frame + timestamp_bytes + width_bytes + height_bytes +
                b'\r\n')
         time.sleep(0.5 / picamera.camera.framerate)
-
-
-def timestamp_generator():
-    while True:
-        timestamp = time.time()
-
-        timestamp_bytes = struct.pack('d', timestamp)
-        yield b'\xff\xd8' + timestamp_bytes + b'\xff\xd9'
-        time.sleep(0.0167)
-
-@app.route('/api/robot/timestamp', methods=['GET'])
-@auth.login_required
-def get_timestamp():
-    """Stream frames from the right camera to the client"""
-    return Response(timestamp_generator())
 
 
 @app.route('/api/robot/rightcam', methods=['GET'])
@@ -159,7 +181,8 @@ def get_camera_with_meta():
     """Stream frames from the right camera to the client"""
     if auth.username() == ROBOT_USER:
         return Response(frame_generator_with_meta(Camera()))
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/imu', methods=['PUT'])
 @auth.login_required
@@ -167,7 +190,8 @@ def put_imu():
     """Function for the robot. Update the IMU's data on the server"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/trajectory', methods=['PUT'])
 @auth.login_required
@@ -175,7 +199,8 @@ def put_trajectory():
     """Function for the robot. Update the trajectory on the server according to the current algorithm in use"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/sound', methods=['POST'])
 @auth.login_required
@@ -183,7 +208,8 @@ def post_sound():
     """Function for the robot. Update the list of sounds"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/sound', methods=['PUT'])
 @auth.login_required
@@ -191,7 +217,8 @@ def put_sound():
     """Function for the robot. Update the list of sounds"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/move_command', methods=['POST'])
 @auth.login_required
@@ -199,7 +226,8 @@ def post_move_command():
     """Function for the robot. Update the list of move commands"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/move_command', methods=['PUT'])
 @auth.login_required
@@ -207,7 +235,8 @@ def put_move_command():
     """Function for the robot. Update the list of move commands"""
     if auth.username() == ROBOT_USER:
         return jsonify()
-
+    else:
+        return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 @app.route('/api/robot/look', methods=['POST'])
 @auth.login_required

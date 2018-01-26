@@ -9,8 +9,15 @@ class Camera(BaseCamera):
     def frames(cls):
         with picamera.PiCamera() as camera:
             # camera.resolution = (640, 480)
-            camera.resolution = (720, 480)
-            camera.framerate = 60.0
+            # camera.resolution = (720, 480)
+            camera.resolution = (410, 308)
+            camera.framerate = 30.0
+            camera.exposure_mode = "antishake"
+            camera.shutter_speed = 0
+            camera.brightness = 50
+            camera.iso = 400
+            camera.awb_mode = "auto"
+
             # let camera warm up
             time.sleep(2)
             cls.camera = camera
